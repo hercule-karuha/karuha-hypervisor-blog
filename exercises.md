@@ -447,3 +447,23 @@ pub enum Exception {
 Exception只处理了：LoadGuestPageFault，StoreGuestPageFault，VirtualSupervisorEnvCall。
 
 
+
+## 练习4
+
+16次，和老师合同学交流了很多。
+
+
+
+
+
+## 练习5
+
+![<!--main.rs-->](./pictures/e-4.png)
+
+![e-5](./pictures/e-5.png)
+
+![e-6](./pictures/e-6.png)![e-7](./pictures/e-7.png)
+
+修改上面几样就成功了。
+
+![](./pictures/e-8.png)
