@@ -371,3 +371,79 @@ sepc是程序的入口。
 a0和a1分别根据linux的约定保存当前hart id和dtb。
 
 hgatp保存了页表的信息，用于二段地址翻译（内存虚拟化还没学。
+
+
+
+## 练习3
+
+1. 参考[The RISC-V Instruction Set Manual Volume II: Privileged Architecture](https://drive.google.com/file/d/1EMip5dZlnypTk7pt4WWUKmtjUKTOkBqh/view) Chapter 8(8.6) Traps，分析RISCV版本的Hypercraft存在哪些异常类型，这些异常从触发到处理完成分别经过怎样的特权级别的切换，会涉及到哪些寄存器的设置。
+
+
+
+查看vcpu.run中的代码可得：
+
+```
+ match scause.cause() {
+            Trap::Exception(Exception::VirtualSupervisorEnvCall) => {
+                let sbi_msg = SbiMessage::from_regs(regs.guest_regs.gprs.a_regs()).ok();
+                VmExitInfo::Ecall(sbi_msg)
+            }
+            //.....
+        }
+```
+
+根据scause获取trap的类型。
+
+Trap，Exception，Interrupt的定义在scause.rs中：
+
+```
+/// Trap Cause
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Trap {
+    Interrupt(Interrupt),
+    Exception(Exception),
+}
+
+/// Interrupt
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Interrupt {
+    UserSoft,
+    VirtualSupervisorSoft,
+    SupervisorSoft,
+    UserTimer,
+    VirtualSupervisorTimer,
+    SupervisorTimer,
+    UserExternal,
+    VirtualSupervisorExternal,
+    SupervisorExternal,
+    Unknown,
+}
+
+/// Exception
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Exception {
+    InstructionMisaligned,
+    InstructionFault,
+    IllegalInstruction,
+    Breakpoint,
+    LoadFault,
+    StoreMisaligned,
+    StoreFault,
+    UserEnvCall,
+    VirtualSupervisorEnvCall,
+    InstructionPageFault,
+    LoadPageFault,
+    StorePageFault,
+    InstructionGuestPageFault,
+    LoadGuestPageFault,
+    VirtualInstruction,
+    StoreGuestPageFault,
+    Unknown,
+}
+```
+
+但是根据代码，Interrupt只处理了：SupervisorTimer，SupervisorExternal。
+
+Exception只处理了：LoadGuestPageFault，StoreGuestPageFault，VirtualSupervisorEnvCall。
+
+
