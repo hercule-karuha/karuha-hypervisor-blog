@@ -124,7 +124,7 @@ linux.dts看起来貌似只有一个核心。所以guest os的dtb也要对应修
 		cpu@1 {
 			phandle = <0x05>;
 			device_type = "cpu";
-			reg = <0x00>;
+			reg = <0x01>;
 			status = "okay";
 			compatible = "riscv";
 			riscv,isa = "rv64ima";
@@ -141,7 +141,7 @@ linux.dts看起来貌似只有一个核心。所以guest os的dtb也要对应修
 		cpu@2 {
 			phandle = <0x07>;
 			device_type = "cpu";
-			reg = <0x00>;
+			reg = <0x02>;
 			status = "okay";
 			compatible = "riscv";
 			riscv,isa = "rv64ima";
@@ -158,7 +158,7 @@ linux.dts看起来貌似只有一个核心。所以guest os的dtb也要对应修
 		cpu@3 {
 			phandle = <0x09>;
 			device_type = "cpu";
-			reg = <0x00>;
+			reg = <0x03;
 			status = "okay";
 			compatible = "riscv";
 			riscv,isa = "rv64ima";
