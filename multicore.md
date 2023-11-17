@@ -202,3 +202,16 @@ linux.dts看起来貌似只有一个核心。所以guest os的dtb也要对应修
 
 ![](./pictures/m-3.png)
 
+出现个报错：
+
+![](./pictures/m-4.png)
+
+查看源代码得知是无法生成对应的sbi message，需要处理hart start的sbi
+
+![](./pictures/m-6.png)
+
+
+
+### 多个vcpu的初始化
+
+前面的区域以后再来探索吧
