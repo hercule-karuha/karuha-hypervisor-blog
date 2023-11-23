@@ -272,6 +272,40 @@ static INITED_VCPUS: AtomicUsize = AtomicUsize::new(0);
 
 其他的同步只需要检测INITED_VCPUS的值就好了。
 
-### vcpu状态
+### vcpu可执行状态
 
-副核的vcpu状态
+副核的vcpu初始化的时候没有正确的入口地址，正确的入口地址需要在guest调用 sbi_hart_start的时候才会给出，所以需要一个状态来记录vcpu是否可执行。
+
+在vcpu.rs中已经定义了一个：
+
+```
+/// The availability of vCPU in a VM.
+pub enum VmCpuStatus {
+    /// The vCPU is not powered on.
+    PoweredOff,
+    /// The vCPU is available to be run.
+    Runnable,
+    /// The vCPU has benn claimed exclusively for running on a (physical) CPU.
+    Running,
+}
+```
+
+将他作为一个字段添加到`VmCpuStatus`中。
+
+可运行状态在主核唤醒副核的时候由主核修改所以vcpu需要加锁。
+
+```
+pub struct VmCpus<H: HyperCraftHal> {
+    inner: [Once<Mutex<VCpu<H>>>; VM_CPUS_MAX],
+    marker: core::marker::PhantomData<H>,
+}
+```
+
+在vm.run()里面添加部分代码用来阻止vcpu的运行：
+
+```
+while !self.is_runnable(vcpu_id) {
+    core::hint::spin_loop();
+}
+```
+
