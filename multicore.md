@@ -212,6 +212,66 @@ linux.dts看起来貌似只有一个核心。所以guest os的dtb也要对应修
 
 
 
-### 多个vcpu的初始化
+## 多个vcpu的初始化
 
-前面的区域以后再来探索吧
+我太菜了，所以先整两个cpu。
+
+### secondary_main()
+
+main()函数里面做了这些事情：
+
+- 初始化PerCpu()
+- 创建vcpu
+- 创建vm
+- 创建页表
+- vm.run
+- 目前我所做的是一个vcpu对应一个物理核心，思路是每个物理cpu创建自己的vcpu添加到vm里面。
+
+所以需要把vm变成static的。
+
+```
+use lazy_init::LazyInit;
+
+static mut HS_VM: LazyInit<VM<HyperCraftHalImpl, GuestPageTable>> = LazyInit::new();
+
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+static INITED_VCPUS: AtomicUsize = AtomicUsize::new(0);
+```
+
+模仿arceos定义INITED_VCPUS来记录已经初始化了的cpu，以同步主核和副核的初始化。
+
+在axruntime里面添加secondary_main()的代码：
+
+```
+    #[cfg(feature = "hv")]
+    unsafe {
+        secondary_main(cpu_id);
+    }
+```
+
+并在secondary_main()里面完成初始化操作。
+
+### 同步
+
+主核和副核的初始化需要同步，具体为
+
+1. 主核创建vm后副核才能向vm添加vcpu
+2. 所有副核初始化完毕后主核才能开始运行vm
+3. 所有副核初始化完毕后主核才能运行自己的vcpu
+
+模仿arceos通过`core::hint::spin_loop();`来实现
+
+如副核等待vm初始化的代码：
+
+```
+    while let None = unsafe { HS_VM.try_get() } {
+        core::hint::spin_loop();
+    }
+```
+
+其他的同步只需要检测INITED_VCPUS的值就好了。
+
+### vcpu状态
+
+副核的vcpu状态
