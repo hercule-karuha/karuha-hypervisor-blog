@@ -309,3 +309,74 @@ while !self.is_runnable(vcpu_id) {
 }
 ```
 
+## hart_start的处理
+
+主核启动之后，linux会调用hart_start()来启动副核，需要根据sbi手册的规定来处理。
+
+```
+let vcpu = self.vcpus.get_vcpu(hartid as usize).unwrap();
+let mut vcpu = vcpu.lock();
+vcpu.start_init(hartid, start_addr, opaque);
+vcpu.set_status(crate::VmCpuStatus::Runnable);
+gprs.set_reg(GprIndex::A0, 0);
+```
+
+start负责为vcpu设置寄存器
+
+```
+pub fn start_init(&mut self, hart_id: usize, start_addr: usize, opaque: usize) {
+    self.regs.guest_regs.gprs.set_reg(GprIndex::A0, hart_id);
+    self.regs.guest_regs.gprs.set_reg(GprIndex::A1, opaque);
+    self.regs.guest_regs.sepc = start_addr;
+}
+```
+
+将`VmCpuStatus`设置为`Runnable`之后，vm.run就可以继续向下执行了。
+
+## 处理IPI
+
+为了正常启动还需要处理IPI。
+
+## send_ipi
+
+首先是要处理发送ipi的sbi，简单调用sbi即可。
+
+```
+HyperCallMsg::IPI(ipi) => {
+    let IPIFunction::SendIPI {
+        hart_mask,
+        hart_mask_base,
+    } = ipi;
+    let sbiret = sbi_rt::send_ipi(hart_mask, hart_mask_base);
+    gprs.set_reg(GprIndex::A0, sbiret.error);
+    gprs.set_reg(GprIndex::A0, sbiret.value);
+}
+```
+
+## SupervisorSoft
+
+send_ipi会使得目标核心触发一个SupervisorSoft中断。
+
+但是，按照guest的视角来看，它并不知道HS-MODE发生的事情。
+
+需要处理plic向guest报告一个`VIRTUAL_SUPERVISOR_SOFT`中断。
+
+模仿原本的`handle_irq`写一个`handle_soft_irq`
+
+```
+fn handle_soft_irq(&mut self, vcpu_id: usize) {
+    let context_id = vcpu_id * 2 + 1;
+    // let claim_and_complete_addr = self.plic.base() + 0x0020_0004 + 0x1000 * context_id;
+    // let irq = unsafe { core::ptr::read_volatile(claim_and_complete_addr as *const u32) };
+    // assert!(irq != 0);
+    self.plic.claim_complete[context_id] = 16;
+    CSR.hvip
+        .read_and_set_bits(traps::interrupt::VIRTUAL_SUPERVISOR_SOFT);
+}
+```
+
+和原本的`VIRTUAL_SUPERVISOR_EXTERNAL`还是存在差别，评价为，寄了。
+
+这里将irq写死为一个值，因为如果按照原本处理`EXTERNAL`的办法来处理会得到一个0值。
+
+在某些情况下会卡死，寄。
